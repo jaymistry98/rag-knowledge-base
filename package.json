@@ -1,0 +1,35 @@
+{
+  "name": "rag-knowledge-base",
+  "version": "1.0.0",
+  "description": "Full-stack RAG Knowledge Base App — upload documents and ask AI questions about them using AWS Bedrock, S3, React, and PostgreSQL",
+  "type": "module",
+  "scripts": {
+    "start": "node server/server.js",
+    "dev": "node --watch server/server.js",
+    "test:db": "node server/db.js",
+    "test:s3": "node server/s3Client.js"
+  },
+  "keywords": [
+    "rag",
+    "retrieval-augmented-generation",
+    "aws-bedrock",
+    "aws-s3",
+    "postgresql",
+    "react",
+    "fastify",
+    "generative-ai"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "@aws-sdk/client-bedrock-runtime": "^3.1052.0",
+    "@aws-sdk/client-s3": "^3.1052.0",
+    "@fastify/cors": "^11.2.0",
+    "@fastify/multipart": "^9.4.0",
+    "dotenv": "^17.4.2",
+    "fastify": "^5.8.5",
+    "pg": "^8.21.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.14"
+  }
+}

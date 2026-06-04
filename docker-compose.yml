@@ -1,0 +1,127 @@
+# =============================================================================
+# docker-compose.yml — Full Stack: React + Fastify + PostgreSQL
+# =============================================================================
+# One command to run everything: docker compose up --build
+#
+# 3 services:
+#   postgres  — Database (port 5432)
+#   backend   — Fastify API (port 3001)
+#   frontend  — React via Nginx (port 3000)
+#
+# Docker Compose creates an internal network where services can
+# reach each other by name. The backend connects to "postgres:5432"
+# and the frontend's Nginx proxies to "backend:3001".
+# =============================================================================
+
+version: "3.8"
+
+services:
+  # ---------------------------------------------------------------------------
+  # PostgreSQL Database
+  # ---------------------------------------------------------------------------
+  postgres:
+    # Use the official PostgreSQL 16 image from Docker Hub
+    image: postgres:16
+
+    # Container name for easy reference in logs
+    container_name: rag-postgres
+
+    # Environment variables configure the PostgreSQL instance.
+    # POSTGRES_DB creates the database on first startup.
+    # POSTGRES_USER and POSTGRES_PASSWORD set the credentials.
+    environment:
+      POSTGRES_DB: ragapp
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+
+    # Port mapping — expose PostgreSQL to the host machine.
+    # Useful for connecting with pgAdmin or database tools.
+    # Inside Docker, other services use postgres:5432 (not localhost).
+    ports:
+      - "5432:5432"
+
+    # Volumes persist data across container restarts.
+    # Without a volume, all data is lost when the container stops.
+    # "pgdata:/var/lib/postgresql/data" maps a named volume to Postgres's data dir.
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+    # Health check — Docker waits for PostgreSQL to be ready
+    # before starting services that depend on it.
+    # pg_isready is a built-in PostgreSQL utility that checks if the server
+    # is accepting connections.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d ragapp"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ---------------------------------------------------------------------------
+  # Backend — Fastify API Server
+  # ---------------------------------------------------------------------------
+  backend:
+    # Build from the Dockerfile in the server/ directory
+    build: ./server
+
+    container_name: rag-backend
+
+    # Port mapping — backend accessible on localhost:3001
+    ports:
+      - "3001:3001"
+
+    # Environment variables — override the .env defaults for Docker networking.
+    # IMPORTANT: PG_HOST is "postgres" (the service name above), NOT "localhost".
+    # Inside Docker's network, services reach each other by service name.
+    environment:
+      - PG_HOST=postgres
+      - PG_PORT=5432
+      - PG_DATABASE=ragapp
+      - PG_USER=postgres
+      - PG_PASSWORD=password
+      - SERVER_PORT=3001
+
+    # Load AWS credentials from the .env file in the project root.
+    # This injects AWS_REGION, AWS_ACCESS_KEY_ID, etc. into the container.
+    env_file:
+      - .env
+
+    # depends_on with condition ensures the backend doesn't start
+    # until PostgreSQL is healthy (accepting connections).
+    # Without this, the backend might crash trying to connect
+    # to a database that isn't ready yet.
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+    # Restart automatically if the process crashes
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # Frontend — React App served by Nginx
+  # ---------------------------------------------------------------------------
+  frontend:
+    # Build from the Dockerfile in the client/ directory
+    build: ./client
+
+    container_name: rag-frontend
+
+    # Map port 3000 on host to port 80 in container (Nginx default)
+    # Users access the app at http://localhost:3000
+    ports:
+      - "3000:80"
+
+    # Wait for the backend to be running before starting the frontend.
+    # Nginx needs the backend to be available for proxying API requests.
+    depends_on:
+      - backend
+
+    restart: unless-stopped
+
+# =============================================================================
+# Named Volumes
+# =============================================================================
+# Named volumes persist data independently of container lifecycle.
+# "pgdata" survives docker compose down and docker compose up.
+# To completely reset: docker compose down -v (the -v flag removes volumes)
+volumes:
+  pgdata:
